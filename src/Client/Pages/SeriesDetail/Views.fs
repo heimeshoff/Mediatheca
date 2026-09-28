@@ -1528,6 +1528,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                         // Title & Meta block) so they never disagree.
                                         let nextUpContent =
                                             NextUpCard.decide
+                                                series.Seasons
                                                 (NextUp.compute series.Seasons)
                                                 series.NextEpisodeAirDate
                                                 series.NextSeasonAirDate

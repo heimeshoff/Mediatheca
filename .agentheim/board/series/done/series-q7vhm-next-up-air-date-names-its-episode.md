@@ -1,7 +1,7 @@
 ---
 id: series-q7vhm
 title: Series detail Next Up card — the "Next episode airs …" line names the episode that airs; when it isn't the Next Up episode shown above it (or the series is caught up), the line spells out its season and episode number
-status: doing
+status: done
 type: feature
 context: series
 created: 2026-09-28
@@ -64,3 +64,46 @@ DTO change is needed: `SeriesDetail.Seasons` already carries every episode's `Ai
   consistent.
 - Out of scope: the Dashboard's "Returning soon" and "Next episode" surfaces. This task only covers
   the series detail Next Up card.
+
+## Outcome
+
+`NextUpCard.fs` gains `findAiringEpisode` (private): the first episode, ordered
+by (season, episode), whose `AirDate` date-part matches the server's
+`NextEpisodeAirDate` — several episodes can share a date (a season dropping
+at once), and the lowest by (season, episode) order wins. `airDateLine` now
+takes `seasons` and the `nextUp` episode alongside the two air-date options
+and, on the episode-date branch, picks its wording from `findAiringEpisode`'s
+result:
+- same episode as the Next Up episode shown above the line -> `Airs <date>
+  (<countdown>)`, no numbers repeated
+- a different episode, or no Next Up at all (caught up) -> `Season N,
+  Episode M airs <date> (<countdown>)`
+- no episode in `seasons` matches the air date (a data gap) -> the original
+  `Next episode airs <date> (<countdown>)` wording, unchanged
+The season-level fallback (`Returns <date> (<countdown>)`) and the
+no-date-at-all case are untouched. `decide` threads `seasons` through to
+`airDateLine`; `nextUpCardBody`/the desktop and mobile render slots in
+`Views.fs` needed no change since they only render `CardContent`, whose
+shape is the same as before — only the call site
+`NextUpCard.decide series.Seasons (NextUp.compute series.Seasons) ...`
+gained the new `seasons` argument.
+
+`NextUpCard.test.fs` keeps the 5 original `series-zdqwm` cases (updated for
+the new `seasons` parameter, passed `[]` where irrelevant so the fallback
+generic wording is unchanged) and adds 5 new `series-q7vhm` cases covering:
+same-episode "Airs" wording, a differing airing episode named explicitly,
+caught-up-but-a-named-episode, a shared-date tie broken by lower
+season/episode, and the airing-date-with-no-matching-episode fallback — 10
+tests total, all green. `npm run build` (Fable/Vite production build) and
+`npm run test:client` (Vitest/Fable.Mocha, 22 files / 156 tests) both pass.
+
+The task's last acceptance criterion — "On a real series page, the air line
+reads unambiguously next to the Next Up episode on desktop and mobile" — is
+marked `[human-eye]` in the task and was not verified in a browser; the unit
+tests above exercise the same wording logic that drives both the desktop and
+mobile placements (they share `nextUpCardBody`), but a human should glance at
+a real series-detail page to confirm the visual result reads as intended.
+
+Key files: `src/Client/Pages/SeriesDetail/NextUpCard.fs`,
+`src/Client/Pages/SeriesDetail/NextUpCard.test.fs`,
+`src/Client/Pages/SeriesDetail/Views.fs`.

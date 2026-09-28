@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 15:25 -- Task verified and completed: series-q7vhm - Series detail Next Up card — the "Next episode airs …" line names the episode that airs; when it isn't the Next Up episode shown above it (or the series is caught up), the line spells out its season and episode number
+
+**Type:** Work / Task completion
+**Task:** series-q7vhm - Series detail Next Up card — the "Next episode airs …" line names the episode that airs; when it isn't the Next Up episode shown above it (or the series is caught up), the line spells out its season and episode number
+**Summary:** Series detail Next Up card's air-date line names the airing episode — 'Airs <date>' when it is the Next Up episode shown above, 'Season N, Episode M airs <date>' when it differs or the series is caught up, generic wording when no cached episode matches
+**Duration:** 9m
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 3
+**Tests added:** 5
+**ADRs written:** none
+
+---
+
 ## 2026-09-28 15:17 -- Batch started: [integration-f8ncw, series-q7vhm]
 
 **Type:** Work / Batch start

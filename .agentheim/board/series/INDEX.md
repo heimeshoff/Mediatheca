@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 10
+- **Doing:** 0
+- **Done:** 11
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **series-q7vhm** — Series detail Next Up card — the "Next episode airs …" line names the episode that airs; when it isn't the Next Up episode shown above it (or the series is caught up), the line spells out its season and episode number (feature) — `doing/series-q7vhm-next-up-air-date-names-its-episode.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **series-q7vhm** — Series detail Next Up card — the "Next episode airs …" line names the episode that airs; when it isn't the Next Up episode shown above it (or the series is caught up), the line spells out its season and episode number (feature) — `done/series-q7vhm-next-up-air-date-names-its-episode.md`
 - **series-zdqwm** — Series detail hero — move the upcoming air date ("Next episode airs …" / "Returns …") out of the genre/status/rating row and into the Next Up card, which now also shows when caught up and on mobile (feature) — `done/series-zdqwm-upcoming-air-date-in-next-up-card.md`
 - **series-x4qte** — Add client-side regression coverage for `NextUp.compute` — the frontier rule (gaps behind the furthest-watched episode are history, not a queue) currently has no client test, only its server-side mirror (chore) — `done/series-x4qte-nextup-compute-regression-coverage.md`
 - **series-ww1rb** — Dashboard series cards show only the *current season's* episode dots with a season rail above, and mark the episodes actually watched — extend `DashboardSeriesNextUp` with per-season touched flags and current-season per-episode watched flags, joined at query time per ADR-0048 (feature) — `done/series-ww1rb-dashboard-current-season-dots-real-watch-state.md`
