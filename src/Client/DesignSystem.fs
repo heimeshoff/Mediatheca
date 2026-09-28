@@ -668,15 +668,17 @@ type FilmstripItem = {
 /// `Feliz.Router` / `Icons` / URL helpers.
 let filmstripRow (items: FilmstripItem list) : ReactElement =
     let tileWrapperClass = "flex-[1_0_130px] group"
-    // `.filmstrip-poster` (design-system-k4tw8, replacing the earlier
+    // `.poster-hover-scale` (design-system-k4tw8, replacing the earlier
     // `transition-transform duration-300 group-hover:scale-105` Tailwind
-    // utilities): the same `transform: scale(1.05)` hover mechanism the
-    // other dashboard poster cards use (`.poster-card:hover
-    // .poster-image-container`), sharing that rule's declaration in
-    // index.css via `.group:hover .filmstrip-poster`, rather than a second,
-    // separately-declared Tailwind `group-hover:scale-*` path (which
-    // compiles to the standalone CSS `scale` property, not `transform`).
-    let posterBoxClass = "relative w-full h-[196px] rounded-[var(--radius-poster)] bg-base-300 overflow-hidden filmstrip-poster"
+    // utilities; renamed from `.filmstrip-poster` by design-system-v3qh6
+    // when the Next-episode hero card joined it on the same shared class):
+    // the same `transform: scale(1.05)` hover mechanism the other dashboard
+    // poster cards use (`.poster-card:hover .poster-image-container`),
+    // sharing that rule's declaration in index.css via `.group:hover
+    // .poster-hover-scale`, rather than a second, separately-declared
+    // Tailwind `group-hover:scale-*` path (which compiles to the standalone
+    // CSS `scale` property, not `transform`).
+    let posterBoxClass = "relative w-full h-[196px] rounded-[var(--radius-poster)] bg-base-300 overflow-hidden poster-hover-scale"
     let posterTile (item: FilmstripItem) =
         Html.div [
             prop.className posterBoxClass
@@ -889,7 +891,14 @@ type NextEpisodeHeroCardProps = {
 let nextEpisodeHeroCard (props: NextEpisodeHeroCardProps) : ReactElement =
     let backgroundRef = props.BackdropRef |> Option.orElse props.PosterRef
     Html.div [
-        prop.className (velvetCardHero + " relative w-full aspect-video overflow-hidden transition-transform duration-300 group-hover:scale-105")
+        // `.poster-hover-scale` (design-system-v3qh6): same shared
+        // hover-scale mechanism the filmstrip poster and every
+        // `.poster-image-container` poster card use -- see index.css.
+        // Replaces the Tailwind `transition-transform duration-300
+        // group-hover:scale-105` utilities, which compile to the
+        // standalone CSS `scale` property, a separate code path from
+        // `transform`.
+        prop.className (velvetCardHero + " relative w-full aspect-video overflow-hidden poster-hover-scale")
         prop.children [
             match backgroundRef with
             | Some ref ->

@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 13:20 -- Task verified and completed: design-system-v3qh6 - Games, Books and Series poster hovers get the same smooth mechanism the Movies filmstrip got in design-system-k4tw8 — one shared transform-scale rule on a permanent compositor layer
+
+**Type:** Work / Task completion
+**Task:** design-system-v3qh6 - Games, Books and Series poster hovers get the same smooth mechanism the Movies filmstrip got in design-system-k4tw8 — one shared transform-scale rule on a permanent compositor layer
+**Summary:** Games, Books and Series poster hovers and the Next-episode hero card share the filmstrip's transform-scale rule on a permanent compositor layer (will-change: transform on .poster-image-container and the renamed .poster-hover-scale)
+**Duration:** 13m
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present (re-emitted once via SendMessage — first write used three-backtick fences, parser rejected missing-block)
+**Files changed:** 3
+**Tests added:** 1
+**ADRs written:** none
+
+---
+
 ## 2026-09-28 13:06 -- Batch started: [design-system-v3qh6]
 
 **Type:** Work / Batch start
