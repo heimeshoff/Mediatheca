@@ -5,6 +5,31 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 15:43 -- Task verified and completed: integration-f8ncw - RomM Play boots the game directly — the game page's Play button starts EmulatorJS via RomM's console-mode route and resumes the rom's newest save state, instead of landing on RomM's pre-game setup screen
+
+**Type:** Work / Task completion
+**Task:** integration-f8ncw - RomM Play boots the game directly — the game page's Play button starts EmulatorJS via RomM's console-mode route and resumes the rom's newest save state, instead of landing on RomM's pre-game setup screen
+**Summary:** RomM Play boots the game directly — the Play button hits a Mediatheca redirect endpoint (GET /api/romm/play/{romId}) that 302s EmulatorJS roms into RomM's console-mode boot with the newest save state (fresh boot on none/error), Ruffle/js-dos/PICO-8 unchanged
+**Duration:** 26m
+**Verification:** PASS (iteration 2)
+**Result source:** sidecar · layout both+sentinel · sidecar present (iteration 2 via SendMessage to the same worker; README_DELTA-only fix)
+**Files changed:** 9
+**Tests added:** 15
+**ADRs written:** none
+
+---
+
+## 2026-09-28 15:41 -- Verification failed: integration-f8ncw - RomM Play boots the game directly — the game page's Play button starts EmulatorJS via RomM's console-mode route and resumes the rom's newest save state, instead of landing on RomM's pre-game setup screen
+
+**Type:** Work / Verification failure
+**Task:** integration-f8ncw - RomM Play boots the game directly — the game page's Play button starts EmulatorJS via RomM's console-mode route and resumes the rom's newest save state, instead of landing on RomM's pre-game setup screen
+**Iteration:** 1 of 3
+**Reasons:** README_DELTA names section 'Bounded context' which does not exist (bullet lives under 'Ubiquitous language') — would appended-fallback a contradictory duplicate bullet, replacement body drops still-true romm_rom_platform facts (RomMSync upsert, Cache classification, GameProjection ownership, commit pin); code, Expecto and client build all pass
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker (same worker, bookkeeping-only fix)
+
+---
+
 ## 2026-09-28 15:25 -- Task verified and completed: series-q7vhm - Series detail Next Up card — the "Next episode airs …" line names the episode that airs; when it isn't the Next Up episode shown above it (or the series is caught up), the line spells out its season and episode number
 
 **Type:** Work / Task completion

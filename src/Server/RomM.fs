@@ -463,3 +463,59 @@ module RomM =
         elif jsdosPlatformSlugs.Contains slug then Some "jsdos"
         elif pico8PlatformSlugs.Contains slug then Some "pico8"
         else None
+
+    // ── Play - resume the newest state (integration-f8ncw, ADR-0088) ──
+
+    /// `StateSchema` (RomM tag `5.3.1`, `backend/endpoints/responses/
+    /// assets.py`), trimmed to what picking the newest state needs.
+    /// `Emulator` (wire field `emulator: str | None`) IS decoded, but
+    /// deliberately never used to filter candidates: `console/views/Play.
+    /// vue`'s `boot()` (same tag) picks its EmulatorJS core from the
+    /// BROWSER's own `localStorage` (`player:{romId}:core`, falling back to
+    /// `player:{platformSlug}:core`) -- never from the state it loads, and
+    /// it applies whichever state was requested via `gameManager.loadState`
+    /// regardless of which core wrote it. The server has no visibility into
+    /// that per-browser value, so there is no core to match a state against
+    /// from here. Picking the single newest state (by `updated_at`) is
+    /// therefore the best available choice -- exactly what the task's Notes
+    /// allow when the core question can't be pinned down.
+    type RomMState = {
+        Id: int
+        RomId: int
+        UpdatedAt: DateTime
+        Emulator: string option
+    }
+
+    let private decodeState: Decoder<RomMState> =
+        Decode.object (fun get -> {
+            Id = get.Required.Field "id" Decode.int
+            RomId = get.Required.Field "rom_id" Decode.int
+            UpdatedAt = get.Required.Field "updated_at" decodeUtcDateTime
+            Emulator = get.Optional.Field "emulator" Decode.string
+        })
+
+    let private decodeStates: Decoder<RomMState list> =
+        Decode.list decodeState
+
+    /// `GET /api/states?rom_id={id}` -- a plain array (`list[StateSchema]`),
+    /// unlike `/api/roms`'s paged envelope (confirmed against `backend/
+    /// endpoints/states.py`'s `get_states`, same tag). Returns `Ok None`
+    /// (not an error) when the rom has no states -- the play endpoint
+    /// (integration-f8ncw) treats that identically to a call failure: a
+    /// fresh boot, never blocking Play.
+    let getLatestState (httpClient: HttpClient) (config: RomMConfig) (romId: int) : Async<Result<RomMState option, RomMError>> =
+        async {
+            let url = buildUrl config.BaseUrl (sprintf "/api/states?rom_id=%d" romId)
+            let! result = fetchJsonRejectable httpClient url config.ApiToken
+            match result with
+            | Error e -> return Error e
+            | Ok json ->
+                match Decode.fromString decodeStates json with
+                | Ok states ->
+                    let newest =
+                        states
+                        |> List.sortByDescending (fun s -> s.UpdatedAt)
+                        |> List.tryHead
+                    return Ok newest
+                | Error e -> return Error (RomMOtherFailure (sprintf "Failed to parse RomM states: %s" e))
+        }

@@ -792,6 +792,10 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
             Administration.projectionRebuildStreamHandler connectionFactory projectionHandlers adminGuards
             route "/api/stream/drift-check"
                 >=> Administration.driftCheckStreamHandler connectionFactory projectionHandlers adminGuards
+            // integration-f8ncw (ADR-0088): a plain three-segment route, so
+            // it never collides with Fable.Remoting's own two-segment
+            // `/api/{TypeName}/{Method}` routes below.
+            routef "/api/romm/play/%i" (fun romId -> Api.rommPlayHandler connectionFactory httpClient getRomMConfig romId)
             remotingHandler
             adminRemotingHandler
         ]

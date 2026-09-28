@@ -1349,12 +1349,16 @@ type GameDetail = {
     /// pick Notes-first vs. Overview-first without a second round-trip to
     /// `getNotes`.
     HasNotesContent: bool
-    /// integration-q748k (ADR-0088 concept extended): the server-built URL
-    /// for RomM's own in-browser player for this game's linked rom — `Some`
-    /// only when the game has a `romm_rom_id`, `romm_base_url` is
+    /// integration-q748k (ADR-0088 concept extended), integration-f8ncw:
+    /// `Some` only when the game has a `romm_rom_id`, `romm_base_url` is
     /// configured, and the rom's platform is one RomM's web player
-    /// supports. The client never assembles RomM URLs or knows the
-    /// platform rules; it only renders a Play button when this is `Some`.
+    /// supports. The VALUE is a Mediatheca play endpoint
+    /// (`/api/romm/play/{romId}`, `Api.rommPlayHandler`), never a raw RomM
+    /// URL — loading the game page must never make a live RomM call, so the
+    /// actual redirect target (fresh boot vs. resume-newest-state, and
+    /// which RomM player route) is resolved server-side at CLICK time
+    /// instead. The client never assembles RomM URLs or knows the platform
+    /// rules; it only renders a Play button when this is `Some`.
     RommPlayUrl: string option
 }
 

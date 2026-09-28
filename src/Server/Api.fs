@@ -1137,6 +1137,57 @@ module Api =
                 return! earlyReturn ctx
             }
 
+    /// `GET /api/romm/play/{romId}` (integration-f8ncw, ADR-0088): resolves
+    /// the RomM Play target at CLICK time, never at game-page-load time
+    /// (`GameProjection.getBySlug`'s `RommPlayUrl` just points here now).
+    /// Always a 302, never a partial redirect:
+    ///   - no recorded `romm_rom_platform` row, or the platform has no
+    ///     in-browser player (`RomM.playerRouteFor romId = None`), or
+    ///     `romm_base_url` is unconfigured -> 404.
+    ///   - an EmulatorJS platform (`playerRouteFor = Some "ejs"`) -> calls
+    ///     `RomM.getLatestState` and redirects to RomM's CONSOLE-mode play
+    ///     route, `{base}/console/rom/{id}/play`, with `?state={newestId}`
+    ///     appended when a state exists. Any states-call failure (rejected
+    ///     token, network error, unparsable body) or an empty states list
+    ///     degrades to the SAME route with no `state` param (a fresh boot)
+    ///     -- a RomM problem must never block Play.
+    ///   - Ruffle/js-dos/PICO-8 -> redirects straight to the existing
+    ///     `{base}/rom/{id}/{player}` route (unchanged from integration-
+    ///     q748k), with NO states call at all -- the console Play view only
+    ///     ever runs EmulatorJS.
+    /// `baseUrl.TrimEnd('/')` guards the same double-slash case `RomM.
+    /// buildUrl` guards for the adapter's own calls.
+    let rommPlayHandler
+        (factory: unit -> SqliteConnection)
+        (httpClient: HttpClient)
+        (getRomMConfig: unit -> RomM.RomMConfig)
+        (romId: int)
+        : HttpHandler =
+        fun (next: HttpFunc) (ctx: Microsoft.AspNetCore.Http.HttpContext) ->
+            task {
+                let platformSlug =
+                    use conn = factory ()
+                    GameProjection.getRommRomPlatformSlug conn romId
+                let config = getRomMConfig ()
+                let baseUrl = config.BaseUrl.TrimEnd('/')
+                if System.String.IsNullOrWhiteSpace baseUrl then
+                    return! RequestErrors.NOT_FOUND "RomM is not configured (no romm_base_url)" next ctx
+                else
+                    match platformSlug |> Option.bind RomM.playerRouteFor with
+                    | None ->
+                        return! RequestErrors.NOT_FOUND "No in-browser player for this rom's platform" next ctx
+                    | Some "ejs" ->
+                        let! stateResult = RomM.getLatestState httpClient config romId |> Async.StartAsTask
+                        let target =
+                            match stateResult with
+                            | Ok (Some state) -> sprintf "%s/console/rom/%d/play?state=%d" baseUrl romId state.Id
+                            | Ok None | Error _ -> sprintf "%s/console/rom/%d/play" baseUrl romId
+                        return! redirectTo false target next ctx
+                    | Some player ->
+                        let target = sprintf "%s/rom/%d/%s" baseUrl romId player
+                        return! redirectTo false target next ctx
+            }
+
     /// Effects for `JellyfinImport.syncMovieWatchHistory`, factored out so
     /// both `runJellyfinImport`'s bulk Phase 2 loop and
     /// `removeLocalCopy`'s mandatory preserve-watch-history step

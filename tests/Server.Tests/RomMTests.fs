@@ -79,6 +79,16 @@ let private romDetailFixture =
 let private playSessionsFixture =
     """[{"id":13,"user_id":1,"device_id":"ab70153c-e10b-4d5a-a7f7-791e5fb33f43","rom_id":33,"save_slot":null,"start_time":"2026-09-25T10:43:02","end_time":"2026-09-25T10:43:14","duration_ms":11889,"created_at":"2026-09-25T10:43:17","updated_at":"2026-09-25T10:43:17"},{"id":9,"user_id":1,"device_id":"ab70153c-e10b-4d5a-a7f7-791e5fb33f43","rom_id":20,"save_slot":null,"start_time":"2026-09-24T08:03:30","end_time":"2026-09-24T08:12:06","duration_ms":516090,"created_at":"2026-09-24T08:12:08","updated_at":"2026-09-24T08:12:08"}]"""
 
+/// Hand-authored (not a live recording -- no harness to record against for
+/// this task) directly off `StateSchema` (`backend/endpoints/responses/
+/// assets.py`, tag `5.3.1`): `BaseAsset`'s common fields (`id`, `rom_id`,
+/// `user_id`, `file_name*`, `file_size_bytes`, `full_path`,
+/// `download_path`, `missing_from_fs`, `created_at`, `updated_at`) plus
+/// `StateSchema`'s own `emulator`/`is_public`/`screenshot`. Two states for
+/// the same rom, second one (id 12) the newer by `updated_at`.
+let private statesFixture =
+    """[{"id":11,"rom_id":33,"user_id":1,"file_name":"slot1.state","file_name_no_tags":"slot1","file_name_no_ext":"slot1","file_extension":"state","file_path":"states/33","file_size_bytes":123456,"full_path":"states/33/slot1.state","download_path":"/assets/romm/states/33/slot1.state","missing_from_fs":false,"created_at":"2026-09-20T10:00:00","updated_at":"2026-09-20T10:00:00","emulator":"snes9x","is_public":false,"screenshot":null},{"id":12,"rom_id":33,"user_id":1,"file_name":"slot2.state","file_name_no_tags":"slot2","file_name_no_ext":"slot2","file_extension":"state","file_path":"states/33","file_size_bytes":123999,"full_path":"states/33/slot2.state","download_path":"/assets/romm/states/33/slot2.state","missing_from_fs":false,"created_at":"2026-09-25T10:00:00","updated_at":"2026-09-25T10:00:00","emulator":"snes9x","is_public":false,"screenshot":null}]"""
+
 [<Tests>]
 let rommDecodingTests =
     testList "RomM.fs -- wire decoding against recorded fixtures (integration-jkbm1)" [
@@ -307,4 +317,20 @@ let rommDecodingTests =
                     jsonResponse platformsFixture))
             RomM.getPlatforms http config |> Async.RunSynchronously |> ignore
             Expect.isTrue sawAuthHeader "The bearer token is sent as the Authorization header, not embedded in the URL/logged"
+
+        testCase "getLatestState picks the state with the latest updated_at (integration-f8ncw)" <| fun _ ->
+            let http = new HttpClient(new StubHandler(fun _ -> jsonResponse statesFixture))
+            match RomM.getLatestState http config 33 |> Async.RunSynchronously with
+            | Ok (Some state) -> Expect.equal state.Id 12 "id 12 has the later updated_at -- 2026-09-25 vs 2026-09-20"
+            | other -> failtestf "Expected Ok (Some state), got %A" other
+
+        testCase "getLatestState returns Ok None when the rom has no states" <| fun _ ->
+            let http = new HttpClient(new StubHandler(fun _ -> jsonResponse "[]"))
+            Expect.equal (RomM.getLatestState http config 33 |> Async.RunSynchronously) (Ok None) "An empty states array is not an error -- just nothing to resume from"
+
+        testCase "getLatestState returns Error on an unparsable states response" <| fun _ ->
+            let http = new HttpClient(new StubHandler(fun _ -> jsonResponse "{not valid json"))
+            match RomM.getLatestState http config 33 |> Async.RunSynchronously with
+            | Error (RomM.RomMOtherFailure _) -> ()
+            | other -> failtestf "Expected Error (RomMOtherFailure _), got %A" other
     ]
