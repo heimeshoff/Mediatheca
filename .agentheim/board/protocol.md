@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 11:07 -- Modeling / Refined: design-system-k4tw8 - Movies filmstrip poster hover jitters vertically
+
+**Type:** Modeling / Refine
+**BC:** design-system
+**Status after:** todo
+**Summary:** After the bounce (getBoundingClientRect showed zero drift on both unfixed and fixed code), the builder chose the layer-snap direction. The working hypothesis is sub-pixel raster snapping when Chrome promotes and demotes the compositor layer at transition start and end. The fix applies the salvaged mechanism-unification patch and adds `will-change: transform` to `.filmstrip-poster`. The geometry criterion was dropped and replaced by computed-style checks plus the builder's eye-check; next suspects (poster-shine illusion, FLIP wrapper) are noted for a follow-up.
+
+---
+
 ## 2026-09-28 01:30 -- Work session ended
 
 **Type:** Work / Session end
