@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 13:06 -- Batch started: [design-system-v3qh6]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-v3qh6 - Games, Books and Series poster hovers get the same smooth mechanism the Movies filmstrip got in design-system-k4tw8 — one shared transform-scale rule on a permanent compositor layer
+**Parallel:** no (1 worker — the only ready task)
+
+---
+
 ## 2026-09-28 11:43 -- Modeling / Captured: design-system-v3qh6 - Games, Books and Series poster hovers get the same smooth mechanism the Movies filmstrip got in design-system-k4tw8 — one shared transform-scale rule on a permanent compositor layer
 
 **Type:** Modeling / Capture

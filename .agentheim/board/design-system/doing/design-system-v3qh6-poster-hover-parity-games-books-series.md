@@ -1,7 +1,7 @@
 ---
 id: design-system-v3qh6
 title: Games, Books and Series poster hovers get the same smooth mechanism the Movies filmstrip got in design-system-k4tw8 — one shared transform-scale rule on a permanent compositor layer
-status: todo
+status: doing
 type: bug
 context: design-system
 created: 2026-09-28
