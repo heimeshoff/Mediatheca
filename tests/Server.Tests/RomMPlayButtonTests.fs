@@ -44,14 +44,14 @@ let private linkRommRomId (conn: SqliteConnection) (slug: string) (romId: int) =
 let rommPlayButtonTests =
     testList "GameProjection.getBySlug -- RommPlayUrl (integration-q748k, ADR-0088)" [
 
-        testCase "Some Mediatheca play endpoint for a RomM-linked game on an EmulatorJS platform (integration-f8ncw)" <| fun _ ->
+        testCase "Some \"{base}/rom/{id}/ejs\" for a RomM-linked game on an EmulatorJS platform" <| fun _ ->
             use db = TestDb.withTempDbFactory bootstrap
             seedGame db.Connection "chrono-trigger-1995" "Chrono Trigger" 1995
             linkRommRomId db.Connection "chrono-trigger-1995" 42
             GameProjection.upsertRommRomPlatform db.Connection 42 "snes"
             SettingsStore.setSetting db.Connection "romm_base_url" "https://romm.example.com"
             match GameProjection.getBySlug db.Connection "chrono-trigger-1995" with
-            | Some game -> Expect.equal game.RommPlayUrl (Some "/api/romm/play/42") "Play URL now points at the Mediatheca play endpoint, not a raw RomM URL -- the state resolves at click time (integration-f8ncw)"
+            | Some game -> Expect.equal game.RommPlayUrl (Some "https://romm.example.com/rom/42/ejs") "Play URL built from base url + rom id + player route"
             | None -> failtest "Expected the game to be found"
 
         testCase "None when the game has no RomM rom id" <| fun _ ->
@@ -93,14 +93,14 @@ let rommPlayButtonTests =
             | Some game -> Expect.isNone game.RommPlayUrl "No romm_rom_platform row -- no Play button"
             | None -> failtest "Expected the game to be found"
 
-        testCase "A trailing slash on romm_base_url does not prevent the Play button -- RommPlayUrl no longer embeds romm_base_url at all (integration-f8ncw)" <| fun _ ->
+        testCase "A trailing slash on romm_base_url does not produce a double slash" <| fun _ ->
             use db = TestDb.withTempDbFactory bootstrap
             seedGame db.Connection "trailing-slash-game" "Trailing Slash Game" 2023
             linkRommRomId db.Connection "trailing-slash-game" 46
             GameProjection.upsertRommRomPlatform db.Connection 46 "nes"
             SettingsStore.setSetting db.Connection "romm_base_url" "https://romm.example.com/"
             match GameProjection.getBySlug db.Connection "trailing-slash-game" with
-            | Some game -> Expect.equal game.RommPlayUrl (Some "/api/romm/play/46") "RommPlayUrl is the Mediatheca play endpoint; the trailing-slash-safe join now happens server-side in the play endpoint itself (see RomMPlayEndpointTests.fs)"
+            | Some game -> Expect.equal game.RommPlayUrl (Some "https://romm.example.com/rom/46/ejs") "Trailing slash trimmed -- no double slash before /rom/"
             | None -> failtest "Expected the game to be found"
 
         testCase "The Play URL never contains the RomM API token" <| fun _ ->

@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 0
-- **Done:** 38
+- **Doing:** 1
+- **Done:** 37
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
+- **integration-f8ncw** — RomM Play boots the game directly — the game page's Play button starts EmulatorJS via RomM's console-mode route and resumes the rom's newest save state, instead of landing on RomM's pre-game setup screen (feature) — `doing/integration-f8ncw-romm-play-boots-directly-resuming-latest-state.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (current-month entries live; older months archived verbatim under `done-archive/` — kept for prior-art search, ADR-0039 convention)
 <!-- done-list:start -->
-- **integration-f8ncw** — RomM Play boots the game directly — the game page's Play button starts EmulatorJS via RomM's console-mode route and resumes the rom's newest save state, instead of landing on RomM's pre-game setup screen (feature) — `done/integration-f8ncw-romm-play-boots-directly-resuming-latest-state.md`
 - **integration-q3cg7** — RomM sync fails outright when any play session has a null rom_id — skip orphaned sessions instead of rejecting the whole page (bug) — `done/integration-q3cg7-romm-play-sessions-null-rom-id.md`
 - **integration-t4q7k** — Wire companion-PDF download into the one-time "Import library" bootstrap path (feature) — `done/integration-t4q7k-wire-companion-pdf-download-into-the-one-time-import-library.md`
 - **integration-qqpq9** — Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab (feature) — `done/integration-qqpq9-audible-companion-pdf-download-and-book-detail-link.md`

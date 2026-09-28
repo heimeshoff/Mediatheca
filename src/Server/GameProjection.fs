@@ -871,19 +871,12 @@ module GameProjection =
               // notes_blocks only.
               HasNotesContent =
                 NotesProjection.getForOwner conn MediaType.Game slug |> JournalBlock.hasContent
-              // integration-q748k (ADR-0088 concept extended), integration-
-              // f8ncw: `Some url` only when ALL of — a linked romm_rom_id, a
-              // recorded platform slug RomM's own frontend can actually play
+              // integration-q748k (ADR-0088 concept extended): `Some url`
+              // only when ALL of — a linked romm_rom_id, a recorded
+              // platform slug RomM's own frontend can actually play
               // in-browser (`RomM.playerRouteFor`), and a non-empty
               // `romm_base_url` setting. Any missing piece degrades to
-              // `None` — no button — rather than a partial/broken URL. The
-              // value itself is now the Mediatheca play endpoint (`/api/
-              // romm/play/{romId}`, `Api.rommPlayHandler`/`Composition.fs`),
-              // never a raw RomM URL: loading the game page must never make
-              // a live RomM call, so the actual redirect target (fresh boot
-              // vs. resume-newest-state, `{base}/rom/{id}/{player}` vs.
-              // `{base}/console/rom/{id}/play?state=...`) is resolved by
-              // that endpoint at CLICK time instead.
+              // `None` — no button — rather than a partial/broken URL.
               RommPlayUrl =
                 let rommRomId =
                     if rd.IsDBNull(rd.GetOrdinal("romm_rom_id")) then None
@@ -896,10 +889,10 @@ module GameProjection =
                         else Some (rd.ReadString "romm_platform_slug")
                     platformSlug
                     |> Option.bind RomM.playerRouteFor
-                    |> Option.bind (fun _player ->
+                    |> Option.bind (fun player ->
                         let baseUrl = SettingsStore.getSetting conn "romm_base_url" |> Option.defaultValue ""
                         if System.String.IsNullOrWhiteSpace baseUrl then None
-                        else Some (sprintf "/api/romm/play/%d" romId)) }
+                        else Some (sprintf "%s/rom/%d/%s" (baseUrl.TrimEnd('/')) romId player)) }
         )
 
     /// ADR-0053: composes the display-ready `PlayFacets` for one game by
