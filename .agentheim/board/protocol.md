@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 11:26 -- Task verified and completed: design-system-k4tw8 - Movies filmstrip poster hover jitters vertically — on hover-in the poster nudges down before it zooms, on hover-out it shrinks back then nudges up; the Games/Books/Series poster cards scale cleanly and are the reference
+
+**Type:** Work / Task completion
+**Task:** design-system-k4tw8 - Movies filmstrip poster hover jitters vertically — on hover-in the poster nudges down before it zooms, on hover-out it shrinks back then nudges up; the Games/Books/Series poster cards scale cleanly and are the reference
+**Summary:** Movies filmstrip poster hover scales through the shared poster-card transform rule and stays on a permanent compositor layer (will-change: transform), removing the promote/demote raster-snap nudge
+**Duration:** 25m
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present (re-emitted once via SendMessage — first sidecar used three-backtick fences, missing-block)
+**Files changed:** 4
+**Tests added:** 1
+**ADRs written:** none
+
+---
+
 ## 2026-09-28 11:10 -- Batch started: [design-system-k4tw8]
 
 **Type:** Work / Batch start

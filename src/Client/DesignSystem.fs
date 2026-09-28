@@ -668,7 +668,15 @@ type FilmstripItem = {
 /// `Feliz.Router` / `Icons` / URL helpers.
 let filmstripRow (items: FilmstripItem list) : ReactElement =
     let tileWrapperClass = "flex-[1_0_130px] group"
-    let posterBoxClass = "relative w-full h-[196px] rounded-[var(--radius-poster)] bg-base-300 overflow-hidden transition-transform duration-300 group-hover:scale-105"
+    // `.filmstrip-poster` (design-system-k4tw8, replacing the earlier
+    // `transition-transform duration-300 group-hover:scale-105` Tailwind
+    // utilities): the same `transform: scale(1.05)` hover mechanism the
+    // other dashboard poster cards use (`.poster-card:hover
+    // .poster-image-container`), sharing that rule's declaration in
+    // index.css via `.group:hover .filmstrip-poster`, rather than a second,
+    // separately-declared Tailwind `group-hover:scale-*` path (which
+    // compiles to the standalone CSS `scale` property, not `transform`).
+    let posterBoxClass = "relative w-full h-[196px] rounded-[var(--radius-poster)] bg-base-300 overflow-hidden filmstrip-poster"
     let posterTile (item: FilmstripItem) =
         Html.div [
             prop.className posterBoxClass

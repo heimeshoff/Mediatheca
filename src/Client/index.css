@@ -557,7 +557,37 @@ h1, h2, h3, h4, h5, h6 {
     background: linear-gradient(135deg, oklch(50% 0.05 264 / 0.15), oklch(50% 0.05 200 / 0.05));
     transition: transform 0.3s ease;
 }
-.poster-card:hover .poster-image-container {
+/* `.filmstrip-poster` (design-system-k4tw8) is the filmstrip movie tile's
+   own hover-scale target -- same `transition: transform 0.3s ease`, sharing
+   the `.poster-card:hover .poster-image-container` rule's declaration below
+   rather than growing a second one, so the two poster-hover surfaces stay
+   provably identical. It does NOT reuse the `.poster-image-container` class
+   itself: that class also carries `aspect-ratio: 2/3` and its own
+   background/border-radius, which would fight the filmstrip's fixed
+   196px-tall 3a proportions (design-system-wd5zk) -- only the transform
+   mechanism is shared, not the box's own sizing/chrome. Previously the
+   filmstrip tile used Tailwind's `group-hover:scale-*` utility, which
+   Tailwind 4 compiles to the standalone CSS `scale` property (driven by
+   `--tw-scale-*` custom properties) rather than `transform` -- a second,
+   textually-separate hover-zoom code path from every other poster card's
+   `transform: scale(...)`.
+
+   `will-change: transform` keeps the poster permanently on its own
+   compositor layer, instead of only while the hover transition runs. The
+   promote/demote step at the start/end of a transition rasterises the
+   layer at a possibly different sub-pixel row than the in-flow paint,
+   reading as a ~1px vertical nudge just before the zoom starts and just
+   after it ends. A permanent layer removes that promote/demote step, so
+   there is nothing to snap. Deliberately NOT added to
+   `.poster-image-container`: the reference poster cards don't show the
+   nudge, and an extra always-on layer on every poster grid costs GPU
+   memory for no benefit there. */
+.filmstrip-poster {
+    transition: transform 0.3s ease;
+    will-change: transform;
+}
+.poster-card:hover .poster-image-container,
+.group:hover .filmstrip-poster {
     transform: scale(1.05);
 }
 

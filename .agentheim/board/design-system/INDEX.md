@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 25
+- **Doing:** 0
+- **Done:** 26
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **design-system-k4tw8** — Movies filmstrip poster hover jitters vertically — on hover-in the poster nudges down before it zooms, on hover-out it shrinks back then nudges up; the Games/Books/Series poster cards scale cleanly and are the reference (bug) — `doing/design-system-k4tw8-filmstrip-hover-vertical-jitter.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **design-system-k4tw8** — Movies filmstrip poster hover jitters vertically — on hover-in the poster nudges down before it zooms, on hover-out it shrinks back then nudges up; the Games/Books/Series poster cards scale cleanly and are the reference (bug) — `done/design-system-k4tw8-filmstrip-hover-vertical-jitter.md`
 - **design-system-btmdx** — Surviving FLIP items must never fade — drop `FadeIn` from `Motion.fs` so an item present in both the collapsed and expanded view only ever translates (ADR-0073 §1 amended) (bug) — `done/design-system-btmdx-surviving-items-never-fade.md`
 - **design-system-m2v88** — Grow / shared-element FLIP motion primitive — a new `Motion.fs` with a pure `Flip.plan`, a WAAPI `snapshot`/`play`/`growSurface` shell, `flipKey`, a reduced-motion gate, `--duration-grow` (0.5s) / `--ease-grow` tokens, and a StyleGuide specimen (ADR-0073) (feature) — `done/design-system-m2v88-grow-flip-motion-primitive.md`
 - **design-system-fryq7** — Remove the Movies / TV Series / Games items from the main menu (sidebar rail + mobile BottomNav) and delete their three list pages, plus every piece of code only those pages referenced — the Dashboard's per-media tabs already cover what they showed. (refactor) — `done/design-system-fryq7-remove-movies-series-games-nav-and-list-pages.md`

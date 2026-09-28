@@ -99,6 +99,7 @@
     <Compile Include="Views.fs" />
     <Compile Include="Smoke.test.fs" />
     <Compile Include="Motion.test.fs" />
+    <Compile Include="DesignSystem.test.fs" />
     <Compile Include="Route.test.fs" />
     <Compile Include="Components\SearchModal.test.fs" />
     <Compile Include="Components\LocalCopyRemovalDialog.test.fs" />

@@ -1,7 +1,7 @@
 ---
 id: design-system-k4tw8
 title: Movies filmstrip poster hover jitters vertically — on hover-in the poster nudges down before it zooms, on hover-out it shrinks back then nudges up; the Games/Books/Series poster cards scale cleanly and are the reference
-status: doing
+status: done
 type: bug
 context: design-system
 created: 2026-09-27
@@ -75,3 +75,31 @@ follows automatically).
 - Don't add `will-change` to `.poster-image-container` in the same change. The
   reference cards don't jitter, and extra layers across every poster grid cost GPU
   memory.
+
+## Outcome
+
+Fixed the Movies filmstrip poster hover jitter by unifying its hover-scale mechanism with the other dashboard poster cards and permanently promoting it to its own compositor layer.
+
+**1. Unified hover mechanism** (`src/Client/DesignSystem.fs` `filmstripRow`, `src/Client/index.css`): applied the salvaged iteration-1 patch (`.agentheim/salvage/design-system-k4tw8-bounced.patch`, checked clean, applied via `git apply`). The poster box's Tailwind utilities `transition-transform duration-300 group-hover:scale-105` (which Tailwind 4 compiles to the standalone CSS `scale` property, a separate code path from `transform`) were replaced with a `.filmstrip-poster` class. `index.css` now scales it through the *same* selector list `.poster-card:hover .poster-image-container` uses (`transform: scale(1.05)`), via `.poster-card:hover .poster-image-container, .group:hover .filmstrip-poster { transform: scale(1.05); }` — one declaration, not two textually-separate hover-zoom rules.
+
+**2. Permanent compositor layer**: added `will-change: transform` to `.filmstrip-poster` in `index.css`. Per the task's working hypothesis, Chrome previously only promoted the element to its own compositor layer while the transform transition ran; at a fractional page offset the promoted layer could rasterise to a different pixel row than the in-flow paint, reading as a ~1px nudge at the start and end of the hover transition. A permanently-promoted layer removes the promote/demote step. Deliberately *not* added to `.poster-image-container` (the reference poster cards don't jitter, and an always-on layer on every poster grid costs GPU memory for no benefit there), per the task's Notes.
+
+The StyleGuide page's "Velvet Lobby Patterns" section (`src/Client/Pages/StyleGuide/Views.fs`) renders `filmstripRow` directly and follows the change automatically — no edit needed there.
+
+**Testing**: added `src/Client/DesignSystem.test.fs` (registered in `src/Client/Client.fsproj`), a Vitest/Fable.Mocha test that renders `filmstripRow` via `react-dom/server`'s `renderToStaticMarkup` (no DOM needed, matching this suite's `environment: "node"` config) and asserts the poster box's class list carries `filmstrip-poster` and neither `group-hover:scale` nor `transition-transform` — directly exercising acceptance criterion 1. Confirmed it fails for the right reason against the pre-fix code (missing `filmstrip-poster`), then passes after the fix.
+
+Acceptance criteria 2 and 3 (computed-style/transition behavior) aren't unit-testable under this project's `environment: "node"` Vitest config (no DOM/CSS engine) — verified instead via a live headless-Chromium check (Playwright, launched directly, not through `playwright.config.ts`'s webServer, to avoid touching the live dev stack on 5000/5173) against the built server on `127.0.0.1:5104` with a temp `DATA_DIR`, loading the StyleGuide page's filmstrip specimen:
+- At rest: `getComputedStyle(posterBox).willChange === "transform"` — confirmed.
+- Hovered (after the 300ms transition settles): `getComputedStyle(posterBox).transform === "matrix(1.05, 0, 0, 1.05, 0, 0)"` — confirmed.
+- After mouse-leave: back to `"none"` — confirmed.
+- Tile wrapper's bounding rect was identical (same x/y/width/height) at rest, during hover, and after leave — confirmed no layout movement.
+
+`npm run build` passes (typecheck + Vite production build). `npm run test:client` (`vitest run`) is green: 22 files, 150 tests (149 prior + 1 new).
+
+Acceptance criterion 5 ("looks as smooth as Games/Books/Series posters, no down-then-zoom or shrink-then-up nudge") is marked `[human-eye]` in the task and is for the builder to confirm live; not verifiable by an automated worker.
+
+Key files:
+- `C:\src\heimeshoff\containers\mediatheca\.worktrees\design-system-k4tw8\src\Client\DesignSystem.fs` (~l.669-684, `filmstripRow`'s `posterBoxClass`)
+- `C:\src\heimeshoff\containers\mediatheca\.worktrees\design-system-k4tw8\src\Client\index.css` (`.filmstrip-poster` / `.poster-card:hover .poster-image-container, .group:hover .filmstrip-poster` rules, ~l.550-580)
+- `C:\src\heimeshoff\containers\mediatheca\.worktrees\design-system-k4tw8\src\Client\DesignSystem.test.fs` (new)
+- `C:\src\heimeshoff\containers\mediatheca\.worktrees\design-system-k4tw8\src\Client\Client.fsproj` (registers the new test file)
