@@ -4,6 +4,10 @@ services:
   mediatheca:
     image: mediatheca:latest
     container_name: mediatheca
+    # Resolve *.ts.net (Jellyfin, qBittorrent, RomM) via Tailscale MagicDNS. Without this, Docker
+    # snapshots the host resolv.conf at boot, and the LAN router answers NXDOMAIN first.
+    dns:
+      - 100.100.100.100
     # ports removed - accessed via Tailscale only
     # - "5000:5000"
     volumes:
